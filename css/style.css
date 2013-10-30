@@ -1,3 +1,27 @@
 @charset "UTF-8";
 /* CSS Document */
 
+.asset{
+	border: solid 10px transparent;
+	border-color:#464646;
+	width:100px;
+}
+
+.asset:hover{
+    border: solid 10px transparent;
+    border-color: #ffffff;
+}
+
+body{
+/*	margin:0px 0px;
+	padding:0px 0px 0px 0px;*/
+	background-color:#464646;
+}
+
+#mainpage{
+	padding:10px 10px;
+	margin:0px 0px;
+	background-color:#333333;
+	color: #ffffff;
+	width: 100%;
+}*/

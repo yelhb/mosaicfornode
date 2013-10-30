@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?><ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.example.mosaicfornode" ExtensionBundleVersion="1.0" Version="4.0">
 	<ExtensionList>
-		<Extension Id="com.example.pscc" Version="1.0"/>
+		<Extension Id="com.example.mosaicfornode" Version="1.0"/>
 	</ExtensionList>
 	<ExecutionEnvironment>
 		<HostList>
@@ -10,7 +10,7 @@
 			<Host Name="IDSN" Version="8.0"/>
 			<Host Name="AICY" Version="8.0"/>
 			<Host Name="ILST" Version="16.0"/>
-			<Host Name="PHSP" Version="13.0"/>
+			<Host Name="PHSP" Version="14.0"/>
 			<Host Name="PHXS" Version="13.0"/>
 			<Host Name="PPRO" Version="6.0"/>
 			<Host Name="CNTB" Version="6.1"/>

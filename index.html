@@ -1,15 +1,260 @@
 <!doctype html>
 <html>
-<head>
-<meta charset="UTF-8">
-<title>Mosaic For Node.js</title>
-<script src="js/jquery.js"></script>
-<script src="js/CSInterface.js"></script>
-<script src="js/IMSInterface.js"></script>
-<script>
-</script>
-</head>
+  <head>
+    <meta charset="UTF-8">
+    <title>Mosaic For Node.js</title>
+    <link href="css/style.css" rel="stylesheet" type="text/css"/>	
+    <script src="js/jquery.js"></script>
+    <script src="js/CSInterface.js"></script>
+    <script src="js/IMSInterface.js"></script>
+    <script>
+		var cc_url = "https://creative.adobe.com/api/v1/";
+		var token_type = "Bearer";
+		var CSLibrary = null;
+		var IMSLibrary = null;
+		var tmpFolderPath = null;
+		var access_token = null;
+		
+		$(document).ready(function() {
+			init();
+			main();
+        });
+		
+		/**
+		 *	Functions for maintaining state of the extension
+		 */
+		function init() {
+			
+			// bind to the form's submit action
+			$('#loginForm').submit(function() {
+				var url = 'https://ims-na1-stg1.adobelogin.com/ims/login/v1/token?';
+				var formParameters = $('#loginForm').formSerialize();
+				
+				login(url, formParameters, function(success) {
+					if (success == true) {
+						main();
+					} else {
+						alert("not logged in");
+					}
+				});
+				
+				// stop the page reloading
+				return false;
+			});
+			
+			CSLibrary = new CSInterface();
+			IMSLibrary = new IMSInterface();
+		}
+		
+		function main() {
+			login("", "", function(success) {
+				if (success == true) {
+					console.log('----->>> Start to load files. <<<----- main() -----');
+					loadFiles();
+				} else {
+					// TODO showAAM
+					console.log('Haven\'t Login, should show AAM.');
+				}
+			});
+		}
+		
+		// TODO (jtam): login failure does not trigger the onComplete callback
+		// TODO (jtam): what's the best way to hide the client secret in a html page?
+		function login(url, formParameters, onComplete) {
+			var imsRef = null;
+			var curAccountGUID = null;
+			var curScope = "openid,creative_cloud";
+			var curClientID = "CEP1";
+			var curClientSecret = "6e273fc1-8d01-4eb8-96c7-cf2c7f0182c8";
+			var detailsDes = "";
+				
+			// IMSConnect
+			imsRef = IMSLibrary.imsConnect();
+			
+			// IMSFetchAccounts
+			var accounts = IMSLibrary.imsFetchAccounts(imsRef, curClientID);
+			$(accounts).find("UserID").each(function() {
+				curAccountGUID = $(this).text();
+			});
+			
+			// IMSFetchAccessToken
+			IMSLibrary.addEventListener("com.adobe.csxs.events.internal.ims.FetchAccessToken", function (event) {
+				var details = event.data;
+				for (var i in details) {
+					if (i == "access_token") {
+						access_token = details[i];
+						onComplete(true);
+					}
+				}
+				
+				IMSLibrary.removeEventListener("com.adobe.csxs.events.internal.ims.FetchAccessToken", this);
+			});
+			
+			IMSLibrary.imsFetchAccessToken(imsRef, curClientID, curClientSecret, curAccountGUID, "", curScope);
+		}
+		
+		// Takes an asset id and returns an <img> tag (the src property is injected at a later stage)
+		function generateImgTag(id) {
+			img_html = '\<img class=\'asset\' id=\'asset-' + id + '\'>\</img>';
+			// alert(img_html);
+			return img_html;
+		}
+		
+		/**
+		 * Load Files form creative Cloud.
+		 * @see Get Collections API: https://stage.adobecc.com/developer/Resources/api/collections/GET.html
+		 */
+		function loadFiles() {
+			var collectionUrl = 'collections/';	
+			console.log('----->>> collectionUrl : ' + collectionUrl + '<<<----- loadFiles() -----');
+			
+			$.ajax({
+				method: "GET",
+				url: cc_url + collectionUrl,
+				dataType: 'json',
+				data: null,
+				headers: {
+					"Authorization" : token_type + ' ' + access_token
+				},
+				success: function(collections) {
+					console.log('----->>> Get collections successfully <<<----- loadFiles() -----');
+					for (var i = 0; i < collections.length; ++i ) {
+						// All user's files in root collection whose name is null;
+						// Caution: under this collection, folder and files will be mixed.
+						if ("" == (collections[i])['name'] || null == (collections[i])['name']) {
+							var collectionID = (collections[i])['url'].substring((collections[i])['url'].lastIndexOf('/') + 1);
+							retrieveCollection(collectionID);
+						}
+					}
+				},
+				error: function(xhr, errStatus, errDesc) {
+					alert("error");
+					alert(errStatus + ": " + errDesc);
+				}
+			});
+		}
+		
+		/**
+		 * Retrieve Collection by collectionID.
+		 * @see Get Collection by ID API: https://stage.adobecc.com/developer/Resources/api/collections/%7Bcollection-id%7D/GET.html
+		 */
+		function retrieveCollection(collectionID) {
+			
+			var collectionUrl = "collections/" + collectionID;
+			$.ajax({
+				method: "GET",
+				url: cc_url + collectionUrl,
+				dataType: 'json',
+				data: null,
+				headers: {
+					"Authorization" : token_type + ' ' + access_token
+				},
+				success: function(collection){
+					console.log('----->>> Get Collection successfully <<<----- retrieveCollection() -----');
+					console.log('assets -->>>' + collection['members']);
+					for (var itm in collection['members']) {
+						console.log(itm + ' ----- ' + (collection['members'])[itm]);
+						var assetID = ((collection['members'])[itm])['id'].substring(((collection['members'])[itm])['id'].lastIndexOf('/') + 1);
+						fetchAsset(assetID);
+					}
+				},
+				error: function(xhr, errStatus, errDesc) {
+					alert("error");
+					alert(errStatus + ": " + errDesc);
+				}
+			});
+		}
+		
+		/**
+		 * Fetch Asset by assetID.
+		 * TODO : fetch thumbnails instead of full-size images
+		 * @see Get Asset API: https://stage.adobecc.com/developer/Resources/api/assets/%7Basset-id%7D/GET.html
+		 */
+		function fetchAsset(assetID) {
+			
+			var url = cc_url + "assets/" + assetID;
+			console.log('----->>> asset URL : ' + url + ' <<<----- fetchAsset() -----');
+			
+			var xhr = new XMLHttpRequest();
+			xhr.open('GET', url, true);
+			try{
+				xhr.responseType = 'arraybuffer';
+			} catch(e) {
+				error_msg("unknown response type");
+			}
+			
+			xhr.setRequestHeader('Authorization', token_type + ' ' + access_token);
+			xhr.onload = function(e) {
+				if (this.status == 200 || this.status == 304) {
+					var uInt8Array = new Uint8Array(this.response);
+					var i = uInt8Array.length;
+					var binaryString = new Array(i);
+					while (i--) {
+						binaryString[i] = String.fromCharCode(uInt8Array[i]);
+					}
+					
+					var data = binaryString.join('');
+					var base64 = window.btoa(data);
+					var img_tag = generateImgTag(assetID);
+					document.getElementById('content').innerHTML = 
+						document.getElementById('content').innerHTML + img_tag;
+					document.getElementById('asset-' + assetID).src = 'data:image/png;base64,' + base64;
+					
+					$(".asset").click(function() {
+						openFileInPS(this.id);
+					});
+					
+					var result = window.cep.fs.writeFile(getTmpFolderPath() + 'asset-' + assetID + '.jpg', base64, cep.encoding.Base64);
+					if (result.err != 0) {
+						error_msg(result.err);
+					}
+				}
+			};
+			
+			xhr.send();
+		}
+		
+		
+		
+		// TODO (jtam): maybe we should create a new empty document and import the image as opposed to opening the image directly
+		// such that the user is forced to save their image as a new document
+		function openFileInPS(assetID) {
+			var script = "app.open(File(\'" + getTmpFolderPath() + assetID + '.jpg' + "\'))";
+			CSLibrary.evalScript(script, function(result) {
+				// TODO: check for failures
+			});	
+		}
+		
+		/**
+		 * Functions for dealing with the file system
+		 */
+		function getTmpFolderPath() {
+			if (tmpFolderPath == null) {
+				tmpFolderPath = CSLibrary.getSystemPath(SystemPath.EXTENSION) + '/tmp/';
+				createTmpFolder();
+			}
+			
+			return tmpFolderPath;
+		}
+		
+		function createTmpFolder() {
+			if (tmpFolderPath != null) {
+				window.cep.fs.makedir(tmpFolderPath);
+			}
+		}
+		
+		/**
+		 * Utility functions
+		 */
+		function error_msg(errorMsg) {
+			alert(errorMsg);
+		}
+    </script>
+  </head>
 
-<body>
-</body>
+  <body>
+    <div id="container">
+      <div id="content"></div>
+    </div>
+  </body>
 </html>
