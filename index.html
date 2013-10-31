@@ -219,8 +219,55 @@
 		// TODO (jtam): maybe we should create a new empty document and import the image as opposed to opening the image directly
 		// such that the user is forced to save their image as a new document
 		function openFileInPS(assetID) {
-			var script = "app.open(File(\'" + getTmpFolderPath() + assetID + '.jpg' + "\'))";
+			var script = "app.open(File(\'" + getTmpFolderPath() + assetID + '.jpg' + "\'));";
+			
+			script += 'if (app.preferences.rulerUnits !== Units.PIXELS) { 			\
+							app.preferences.rulerUnits = Units.PIXELS; 					\
+						} 																	\
+																							\
+						var docRef = app.activeDocument;									\
+						var docWidth = docRef.width;										\
+						var docHeight = docRef.height;									\
+						var divides = 3;													\
+						var gutter = 0;													\
+						var slotWidth = Math.floor(docWidth / divides);				\
+						var slotHeight = Math.floor(docHeight / divides);				\
+						var layerRef = docRef.activeLayer;								\
+						var x, y;															\
+						app.documents.add(slotWidth, slotHeight, 72, \'tmp\');			\
+						var tmpDoc = app.documents.getByName(\'tmp\');					\
+						for (y = docHeight; y > 0; y -= slotHeight) {					\
+							for (x = docWidth; x > 0; x -= slotWidth) {					\
+								docRef.activeLayer = layerRef;							\
+								docRef.selection.select([									\
+									[x - slotWidth, y - slotHeight],						\
+									[x, y - slotHeight],									\
+									[x, y],													\
+									[x - slotWidth, y]									\
+								], SelectionType.REPLACE, 0, false);					\
+								docRef.selection.copy();									\
+								//docRef.artLayers.add();									\
+								//docRef.paste();											\
+								app.activeDocument = tmpDoc;								\
+								tmpDoc.paste();											\
+								var tmpArr = tmpDoc[\'histogram\'];						\
+								var sum = 0;												\
+								for (var i = 0; i <= 255; ++i) {							\
+									sum += (tmpArr[i] * i);								\
+								}															\
+								var ave = sum / (slotWidth * slotHeight);				\
+																							\
+								x -= gutter;												\
+							}																\
+							y -= gutter;													\
+						}																	\
+						layerRef.remove();';
+			console.log('----->>> script : ' +  script + ' <<<-----');
 			CSLibrary.evalScript(script, function(result) {
+				console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
+				if ("undefined" != result || result == EvalScript_ErrMessage ) {
+					alert(result);
+				}
 				// TODO: check for failures
 			});	
 		}
