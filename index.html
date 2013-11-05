@@ -8,12 +8,19 @@
     <script src="js/CSInterface.js"></script>
     <script src="js/IMSInterface.js"></script>
     <script>
-		var cc_url = "https://creative.adobe.com/api/v1/";
-		var token_type = "Bearer";
+		function assetInfo(p_asset, p_value) {
+			var assetID = p_asset;
+			var value = p_value;
+		}
+	
+		var cc_url = 'https://creative.adobe.com/api/v1/';
+		var token_type = 'Bearer';
+		var fs = require('fs');
 		var CSLibrary = null;
 		var IMSLibrary = null;
 		var tmpFolderPath = null;
 		var access_token = null;
+		var assetsList = new Array();
 		
 		$(document).ready(function() {
 			init();
@@ -44,6 +51,13 @@
 			
 			CSLibrary = new CSInterface();
 			IMSLibrary = new IMSInterface();
+			
+			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+				if (err) {
+					error_msg(err);
+				}
+				fs.closeSync(fd);
+			});
 		}
 		
 		function main() {
@@ -51,6 +65,7 @@
 				if (success == true) {
 					console.log('----->>> Start to load files. <<<----- main() -----');
 					loadFiles();
+					//prepareCandidate();
 				} else {
 					// TODO showAAM
 					console.log('Haven\'t Login, should show AAM.');
@@ -174,7 +189,6 @@
 			
 			var url = cc_url + "assets/" + assetID;
 			console.log('----->>> asset URL : ' + url + ' <<<----- fetchAsset() -----');
-			
 			var xhr = new XMLHttpRequest();
 			xhr.open('GET', url, true);
 			try{
@@ -200,6 +214,32 @@
 						document.getElementById('content').innerHTML + img_tag;
 					document.getElementById('asset-' + assetID).src = 'data:image/png;base64,' + base64;
 					
+					// compute each img
+					var imgInfo = new Image();
+					imgInfo.src = 'data:image/png;base64,' + base64;
+					imgInfo.onload = function() {
+						document.getElementById('can').width = imgInfo.width;
+						document.getElementById('can').height = imgInfo.height;
+						var context = document.getElementById('can').getContext('2d');
+						context.drawImage(imgInfo, 0, 0, imgInfo.width, imgInfo.height, 0 , 0, imgInfo.width, imgInfo.height);
+						var imgData = context.getImageData(0, 0, imgInfo.width, imgInfo.height);
+						var index = imgInfo.height * imgInfo.width;
+						var sum = 0;
+						var ave = 0;
+						
+						// compute average value without alpha
+						for (var i = 0; i < index * 4; ++i) {
+							sum += imgData.data[i];
+							sum += imgData.data[i + 1];
+							sum += imgData.data[i + 2];
+							i += 3;
+						}
+						ave = sum / (index * 3);
+						assetsList.push(new assetInfo(assetID, ave));
+						console.log('assetID : ' + assetID + ' ave = ' + ave + ' assetsList.length :' + assetsList.length);
+						writeAssetsInfo(assetID + ':' + ave + '\n');
+					}
+					
 					$(".asset").click(function() {
 						openFileInPS(this.id);
 					});
@@ -214,53 +254,103 @@
 			xhr.send();
 		}
 		
-		
-		
 		// TODO (jtam): maybe we should create a new empty document and import the image as opposed to opening the image directly
 		// such that the user is forced to save their image as a new document
 		function openFileInPS(assetID) {
 			var script = "app.open(File(\'" + getTmpFolderPath() + assetID + '.jpg' + "\'));";
 			
-			script += 'if (app.preferences.rulerUnits !== Units.PIXELS) { 			\
-							app.preferences.rulerUnits = Units.PIXELS; 					\
-						} 																	\
-																							\
-						var docRef = app.activeDocument;									\
-						var docWidth = docRef.width;										\
-						var docHeight = docRef.height;									\
-						var divides = 3;													\
-						var gutter = 0;													\
-						var slotWidth = Math.floor(docWidth / divides);				\
-						var slotHeight = Math.floor(docHeight / divides);				\
-						var layerRef = docRef.activeLayer;								\
-						var x, y;															\
-						app.documents.add(slotWidth, slotHeight, 72, \'tmp\');			\
-						var tmpDoc = app.documents.getByName(\'tmp\');					\
-						for (y = docHeight; y > 0; y -= slotHeight) {					\
-							for (x = docWidth; x > 0; x -= slotWidth) {					\
-								docRef.activeLayer = layerRef;							\
-								docRef.selection.select([									\
-									[x - slotWidth, y - slotHeight],						\
-									[x, y - slotHeight],									\
-									[x, y],													\
-									[x - slotWidth, y]									\
-								], SelectionType.REPLACE, 0, false);					\
-								docRef.selection.copy();									\
-								//docRef.artLayers.add();									\
-								//docRef.paste();											\
-								app.activeDocument = tmpDoc;								\
-								tmpDoc.paste();											\
-								var tmpArr = tmpDoc[\'histogram\'];						\
-								var sum = 0;												\
-								for (var i = 0; i <= 255; ++i) {							\
-									sum += (tmpArr[i] * i);								\
-								}															\
-								var ave = sum / (slotWidth * slotHeight);				\
-																							\
-								x -= gutter;												\
-							}																\
-							y -= gutter;													\
-						}																	\
+			script += 'if (app.preferences.rulerUnits !== Units.PIXELS) { 									\n\
+							app.preferences.rulerUnits = Units.PIXELS; 											\n\
+						} 																							\n\
+																													\n\
+						var assetsList = new Array();															\n\
+						var docRef = app.activeDocument;															\n\
+						var docWidth = docRef.width;																\n\
+						var docHeight = docRef.height;															\n\
+						var divides = 4;																			\n\
+						var gutter = 0;																			\n\
+						var slotWidth = Math.floor(docWidth / divides);										\n\
+						var slotHeight = Math.floor(docHeight / divides);										\n\
+						var layerRef = docRef.activeLayer;														\n\
+						var x, y;																					\n\
+																													\n\
+						docWidth = slotWidth * divides + gutter * (divides - 1);								\n\
+						docHeight = slotHeight * divides + gutter * (divides - 1);							\n\
+						docRef.resizeImage(docWidth, docHeight);												\n\
+																													\n\
+						function AssetInfo(p_assetID, p_value) {												\n\
+							this.assetID = p_assetID;																\n\
+							this.value = p_value;																	\n\
+						}																							\n\
+																													\n\
+						function getSimilarImage(value, threshold) {											\n\
+							for (var i = 0; i < assetsList.length; ++i) {										\n\
+								if (Math.abs(assetsList[i].value - value) <= threshold) {						\n\
+									return assetsList[i].assetID;												\n\
+								}																					\n\
+							}																						\n\
+							var randomID = Math.floor((Math.random() * assetsList.length));					\n\
+							return assetsList[randomID].assetID;												\n\
+						}																							\n\
+																													\n\
+						app.documents.add(slotWidth, slotHeight, 72, \'tmp\');									\n\
+						var tmpDoc = app.documents.getByName(\'tmp\');											\n\
+						var fhandle = new File(\'' + getTmpFolderPath() + 'assetsInfo.txt\');					\n\
+																													\n\
+						fhandle.open("r");																		\n\
+																													\n\
+						while (!fhandle.eof) {																	\n\
+							var line = fhandle.readln();															\n\
+							var splitLine = line.split(":")														\n\
+							if ("asset-" + splitLine[0] != \'' + assetID + '\') {								\n\
+								assetsList.push(new AssetInfo(splitLine[0], splitLine[1]));					\n\
+							}																						\n\
+						}																							\n\
+																													\n\
+						for (y = docHeight; y > 0; y -= slotHeight) {											\n\
+							for (x = docWidth; x > 0; x -= slotWidth) {											\n\
+								app.activeDocument = docRef;														\n\
+								docRef.activeLayer = layerRef;													\n\
+								docRef.selection.select([															\n\
+									[x - slotWidth, y - slotHeight],												\n\
+									[x, y - slotHeight],															\n\
+									[x, y],																			\n\
+									[x - slotWidth, y]															\n\
+								], SelectionType.REPLACE, 0, false);											\n\
+								docRef.selection.copy();															\n\
+								app.activeDocument = tmpDoc;														\n\
+								tmpDoc.paste();																	\n\
+																													\n\
+								var rList = tmpDoc.channels.getByName("Red")["histogram"];					\n\
+								var gList = tmpDoc.channels.getByName("Green")["histogram"];					\n\
+								var bList = tmpDoc.channels.getByName("Blue")["histogram"];					\n\
+								var sum = 0;																		\n\
+								for (var i = 0; i <= 255; ++i) {													\n\
+									sum += ((rList[i] * i) + (gList[i] * i) + (bList[i] * i));				\n\
+								}																					\n\
+								var ave = sum / (slotWidth * slotHeight * 3);									\n\
+								var tmpID = getSimilarImage(ave, 5);											\n\
+																													\n\
+								app.open(File(\'' + getTmpFolderPath() + 'asset-\'+ tmpID + \'.jpg\'));		\n\
+								var tmpDocRef = app.activeDocument;												\n\
+								tmpDocRef.resizeImage(slotWidth, slotHeight);									\n\
+								tmpDocRef.selection.select([														\n\
+									[0, 0],																			\n\
+									[tmpDocRef.width, 0],															\n\
+									[tmpDocRef.width, tmpDocRef.height],										\n\
+									[0, tmpDocRef.height]															\n\
+								], SelectionType.EXTEND, 0, false);												\n\
+								tmpDocRef.selection.copy();														\n\
+								app.activeDocument = docRef;														\n\
+								docRef.activeLayer = layerRef;													\n\
+								docRef.artLayers.add();															\n\
+								docRef.paste();																	\n\
+								tmpDocRef.close(SaveOptions.DONOTSAVECHANGES);									\n\
+								//tmpDoc.artLayers.removeAll();													\n\
+								x -= gutter;																		\n\
+							}																						\n\
+							y -= gutter;																			\n\
+						}																							\n\
 						layerRef.remove();';
 			console.log('----->>> script : ' +  script + ' <<<-----');
 			CSLibrary.evalScript(script, function(result) {
@@ -270,6 +360,72 @@
 				}
 				// TODO: check for failures
 			});	
+		}
+			
+		/**
+		 * Traverse all files and compute their average value.
+		 */
+		function prepareCandidate() {
+			var script;
+			var dirPath = getTmpFolderPath();
+			var m_directory = window.cep.fs.readdir(dirPath);
+			
+			if (!m_directory['err']) {
+				var fileList = m_directory.data;
+				for (var itm in fileList) {
+					var fileState = window.cep.fs.stat(dirPath + fileList[itm]);
+					if (!fileState.data.isDirectory()) {
+						script = 'app.open(File(\'' + dirPath + fileList[itm] + '\'));';
+						script += '															\
+						if (app.preferences.rulerUnits !== Units.PIXELS) { 			\
+							app.preferences.rulerUnits = Units.PIXELS; 					\
+						} 																	\
+						var docRef = app.activeDocument;									\
+						var rList = docRef.channels.getByName("Red")["histogram"]; 	\
+						var gList = docRef.channels.getByName("Green")["histogram"];	\
+						var bList = docRef.channels.getByName("Blue")["histogram"];	\
+						var sum = 0;														\
+						for (var i = 0; i <= 255; ++i) {									\
+							sum += ((rList[i] * i) + (gList[i] * i) + (bList[i] * i));\
+						}																	\
+						alert((docRef.width * docRef.height) + "aver : " + sum / (docRef.width * docRef.height * 3));	\
+						//var ave = sum / (docRef.width * docRef.height);				\
+						app.activeDocument.close();										\
+						';
+						console.log('----->>> Script: ' + script + ' <<<----- prepareCandidate()');
+						CSLibrary.evalScript(script, function(result) {
+							console.log('----->>> evalScript callback result : ' + result + script + ' <<<-----');
+							if ("undefined" != result || result == EvalScript_ErrMessage ) {
+								alert(result);
+							}
+							// TODO: check for failures
+						});	
+					}
+				}
+			}
+		}
+		
+		/**
+		 * Write assetsList to file. So that PS extendScript can read info.
+		 */
+		function writeAssetsInfo(info) {
+			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'a+', function(err, fd) {
+				if (err) {
+					error_msg(err);
+				}
+				
+				var buff = new Buffer(info);
+				fs.write(fd, buff, 0, buff.length, null, function(err, written, buffer) {
+					if (err) {
+						error_msg(err);
+					}
+					console.log('----->>> written buffer Size:' + written + ' <<<----- writeAssetsInfo() ');
+				});
+				
+				setTimeout(function() {
+					fs.closeSync(fd);
+				}, 1000);
+			});
 		}
 		
 		/**
@@ -303,5 +459,6 @@
     <div id="container">
       <div id="content"></div>
     </div>
+    <canvas id="can" style="border:1px solid #F7F2F2; display:none"></canvas>
   </body>
 </html>
