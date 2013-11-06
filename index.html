@@ -4,13 +4,32 @@
     <meta charset="UTF-8">
     <title>Mosaic For Node.js</title>
     <link href="css/style.css" rel="stylesheet" type="text/css"/>	
-    <script src="js/jquery.js"></script>
-    <script src="js/CSInterface.js"></script>
-    <script src="js/IMSInterface.js"></script>
+    <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/CSInterface.js"></script>
+    <script type="text/javascript" src="js/IMSInterface.js"></script>
+    <script type="text/javascript" src="js/jquery.masonry.min.js"></script>
+    <script type="text/javascript" src="js/imagesloaded.js"></script>
     <script>
-		function assetInfo(p_asset, p_value) {
-			var assetID = p_asset;
-			var value = p_value;
+	
+	// Printerest
+		//$(function() {
+			var $cnter = $('#content');
+			$cnter.imagesLoaded(function() {
+				$cnter.masonry({
+					itemSelector : '.item',
+					columnWidth : 120,
+					gutterWidth : 2,
+					resizeable : true,
+					isFitWidth : true,
+					isOriginLeft : false,
+					isAnimated : true
+				});
+			});
+		//});
+			
+		function AssetInfo(p_assetID, p_colorVector) {
+			this.assetID = p_assetID;
+			this.colorVector = p_colorVector;
 		}
 	
 		var cc_url = 'https://creative.adobe.com/api/v1/';
@@ -110,7 +129,7 @@
 		
 		// Takes an asset id and returns an <img> tag (the src property is injected at a later stage)
 		function generateImgTag(id) {
-			img_html = '\<img class=\'asset\' id=\'asset-' + id + '\'>\</img>';
+			img_html = '\<div class="item"><img class=\'asset\' id=\'asset-' + id + '\'>\</img></div>';
 			// alert(img_html);
 			return img_html;
 		}
@@ -167,7 +186,12 @@
 				success: function(collection){
 					console.log('----->>> Get Collection successfully <<<----- retrieveCollection() -----');
 					console.log('assets -->>>' + collection['members']);
+					var limit = 0;
 					for (var itm in collection['members']) {
+						if (limit >= 30 ) {
+							break;
+						}
+						limit++;
 						console.log(itm + ' ----- ' + (collection['members'])[itm]);
 						var assetID = ((collection['members'])[itm])['id'].substring(((collection['members'])[itm])['id'].lastIndexOf('/') + 1);
 						fetchAsset(assetID);
@@ -225,7 +249,7 @@
 						var imgData = context.getImageData(0, 0, imgInfo.width, imgInfo.height);
 						var index = imgInfo.height * imgInfo.width;
 						var sum = 0;
-						var ave = 0;
+						/*var ave = 0;
 						
 						// compute average value without alpha
 						for (var i = 0; i < index * 4; ++i) {
@@ -236,8 +260,8 @@
 						}
 						ave = sum / (index * 3);
 						assetsList.push(new assetInfo(assetID, ave));
-						console.log('assetID : ' + assetID + ' ave = ' + ave + ' assetsList.length :' + assetsList.length);
-						writeAssetsInfo(assetID + ':' + ave + '\n');
+						console.log('assetID : ' + assetID + ' ave = ' + ave + ' assetsList.length :' + assetsList.length);*/
+						writeAssetsInfo(assetID + getVector(imgData, index) + '\n');
 					}
 					
 					$(".asset").click(function() {
@@ -267,7 +291,7 @@
 						var docRef = app.activeDocument;															\n\
 						var docWidth = docRef.width;																\n\
 						var docHeight = docRef.height;															\n\
-						var divides = 4;																			\n\
+						var divides = 3;																			\n\
 						var gutter = 0;																			\n\
 						var slotWidth = Math.floor(docWidth / divides);										\n\
 						var slotHeight = Math.floor(docHeight / divides);										\n\
@@ -278,19 +302,57 @@
 						docHeight = slotHeight * divides + gutter * (divides - 1);							\n\
 						docRef.resizeImage(docWidth, docHeight);												\n\
 																													\n\
-						function AssetInfo(p_assetID, p_value) {												\n\
+						function AssetInfo(p_assetID, p_rVector, p_gVector, p_bVector) {						\n\
 							this.assetID = p_assetID;																\n\
-							this.value = p_value;																	\n\
+							this.rVector = p_rVector;																\n\
+							this.gVector = p_gVector;																\n\
+							this.bVector = p_bVector;																\n\
 						}																							\n\
 																													\n\
-						function getSimilarImage(value, threshold) {											\n\
+						function getCorrelation(x, y) {															\n\
+							var xsum = 0;																			\n\
+							var ysum = 0;																			\n\
+							var sum = 0;																			\n\
+							var deltax = 0;																		\n\
+							var deltay = 0;																		\n\
+							for (var i = 0; i < 256; ++i) {														\n\
+								xsum += parseFloat(x[i]);															\n\
+								ysum += parseFloat(y[i]);															\n\
+							}																						\n\
+							/*for (var i = 0; i < 256; ++i) {													\n\
+								x[i] = parseFloat(x[i]) / Math.sqrt(xsum);										\n\
+								y[i] = parseFloat(y[i]) / Math.sqrt(ysum);										\n\
+							}*/																						\n\
+																													\n\
+							var xbar = xsum / 256;																\n\
+							var ybar = ysum / 256;																\n\
+							for (var i = 0; i < 256; ++i) {														\n\
+								sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);					\n\
+								deltax += (parseFloat(x[i]) - xbar) * (parseFloat(x[i]) - xbar);				\n\
+								deltay += (parseFloat(y[i]) - ybar) * (parseFloat(y[i]) - ybar);				\n\
+							}																						\n\
+																													\n\
+							return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));								\n\
+						}																							\n\
+																													\n\
+						function getSimilarImage(rVector, gVector, bVector) {									\n\
+							var minv = -1;																			\n\
+							var minindex = 0;																		\n\
+							var correlation;																		\n\
 							for (var i = 0; i < assetsList.length; ++i) {										\n\
-								if (Math.abs(assetsList[i].value - value) <= threshold) {						\n\
-									return assetsList[i].assetID;												\n\
+								var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));\n\
+								var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));\n\
+								var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));\n\
+								correlation = (rcorrelation + gcorrelation + bcorrelation);					\n\
+								if (correlation > minv) {															\n\
+									minv = correlation;															\n\
+									minindex = i;																	\n\
+									if (Math.abs(3 - minv) < 0.000001) {										\n\
+										return assetsList[i].assetID;											\n\
+									}																				\n\
 								}																					\n\
 							}																						\n\
-							var randomID = Math.floor((Math.random() * assetsList.length));					\n\
-							return assetsList[randomID].assetID;												\n\
+							return assetsList[minindex].assetID;												\n\
 						}																							\n\
 																													\n\
 						app.documents.add(slotWidth, slotHeight, 72, \'tmp\');									\n\
@@ -303,7 +365,18 @@
 							var line = fhandle.readln();															\n\
 							var splitLine = line.split(":")														\n\
 							if ("asset-" + splitLine[0] != \'' + assetID + '\') {								\n\
-								assetsList.push(new AssetInfo(splitLine[0], splitLine[1]));					\n\
+								var rlist = new Array(256);														\n\
+								var glist = new Array(256);														\n\
+								var blist = new Array(256);														\n\
+								var k = 0;																			\n\
+								for (var i = 0; i < 256 * 3;) {													\n\
+									rlist[k] = splitLine[i + 1];													\n\
+									glist[k] = splitLine[i + 2];													\n\
+									blist[k] = splitLine[i + 3];													\n\
+									i += 3;																			\n\
+									k++;																			\n\
+								}																					\n\
+								assetsList.push(new AssetInfo(splitLine[0], rlist, glist, blist));			\n\
 							}																						\n\
 						}																							\n\
 																													\n\
@@ -324,13 +397,7 @@
 								var rList = tmpDoc.channels.getByName("Red")["histogram"];					\n\
 								var gList = tmpDoc.channels.getByName("Green")["histogram"];					\n\
 								var bList = tmpDoc.channels.getByName("Blue")["histogram"];					\n\
-								var sum = 0;																		\n\
-								for (var i = 0; i <= 255; ++i) {													\n\
-									sum += ((rList[i] * i) + (gList[i] * i) + (bList[i] * i));				\n\
-								}																					\n\
-								var ave = sum / (slotWidth * slotHeight * 3);									\n\
-								var tmpID = getSimilarImage(ave, 5);											\n\
-																													\n\
+								var tmpID = getSimilarImage(rList, gList, bList);								\n\
 								app.open(File(\'' + getTmpFolderPath() + 'asset-\'+ tmpID + \'.jpg\'));		\n\
 								var tmpDocRef = app.activeDocument;												\n\
 								tmpDocRef.resizeImage(slotWidth, slotHeight);									\n\
@@ -452,12 +519,43 @@
 		function error_msg(errorMsg) {
 			alert(errorMsg);
 		}
+		
+		function getVector(image, index) {
+			var rPart = new Array(256);
+			var gPart = new Array(256);
+			var bPart = new Array(256);
+			var strVector = "";
+			
+			for (var i = 0; i < 256; ++i) {
+				rPart[i] = gPart[i] = bPart[i] = 0;
+			}
+			
+			for (var i = 0; i < index * 4; ++i) {
+				rPart[image.data[i]]++;
+				gPart[image.data[i + 1]]++;
+				bPart[image.data[i + 2]]++;
+				
+				i += 3;
+			}
+			
+			// Generate Vector String
+			for (var i = 0; i < 256; ++i) {
+				strVector += ':';
+				strVector += rPart[i];
+				strVector += ':';
+				strVector += gPart[i];
+				strVector += ':';
+				strVector += bPart[i];
+			}
+			return strVector;
+		}
     </script>
   </head>
 
   <body>
     <div id="container">
-      <div id="content"></div>
+      <div id="content">
+      </div>
     </div>
     <canvas id="can" style="border:1px solid #F7F2F2; display:none"></canvas>
   </body>

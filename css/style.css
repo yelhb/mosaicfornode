@@ -1,21 +1,27 @@
 @charset "UTF-8";
 /* CSS Document */
-
-.asset{
-	border: solid 10px transparent;
-	border-color:#464646;
-	width:100px;
-}
-
-.asset:hover{
-    border: solid 10px transparent;
-    border-color: #ffffff;
-}
-
 body{
 /*	margin:0px 0px;
 	padding:0px 0px 0px 0px;*/
 	background-color:#464646;
+}
+
+.asset{
+	border: solid 5px #DDDDDD; /*transparent;*/
+	border-color:#464646;
+	width: 100px;
+}
+
+.asset:hover{
+    border: solid 5px transparent;
+    border-color: #ffffff;
+}
+
+.item{
+	float: left;
+	width: 110px;
+	min-height: 80px;
+	margin: 0;
 }
 
 #mainpage{
@@ -24,4 +30,4 @@ body{
 	background-color:#333333;
 	color: #ffffff;
 	width: 100%;
-}*/
+}
