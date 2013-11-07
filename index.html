@@ -10,23 +10,6 @@
     <script type="text/javascript" src="js/jquery.masonry.min.js"></script>
     <script type="text/javascript" src="js/imagesloaded.js"></script>
     <script>
-	
-	// Printerest
-		//$(function() {
-			var $cnter = $('#content');
-			$cnter.imagesLoaded(function() {
-				$cnter.masonry({
-					itemSelector : '.item',
-					columnWidth : 120,
-					gutterWidth : 2,
-					resizeable : true,
-					isFitWidth : true,
-					isOriginLeft : false,
-					isAnimated : true
-				});
-			});
-		//});
-			
 		function AssetInfo(p_assetID, p_colorVector) {
 			this.assetID = p_assetID;
 			this.colorVector = p_colorVector;
@@ -43,8 +26,54 @@
 		
 		$(document).ready(function() {
 			init();
-			main();
+			//main();
+			showImages();
+			var $cnter = $('#content');
+			$cnter.imagesLoaded(function() {
+				$cnter.masonry({
+					itemSelector : '.item',
+					columnWidth : 130,
+					gutterWidth : 0,
+					isResizeBound : true,
+					isFitWidth : true,
+					isOriginLeft : true,
+					isAnimated : true
+				});
+			});
+			
+			$('#btnUpdate').click(function() {
+				main();
+			});
         });
+		
+		/**
+		 * The default method for showing images. The files from local folder.
+		 * If the folder is not exist, call update.
+		 */
+		function showImages() {
+			var result = window.cep.fs.readdir(getTmpFolderPath());
+			if (!result['err']) {
+				var resList = result.data;
+				for (var itm in resList) {
+					var fileInfo = window.cep.fs.stat(getTmpFolderPath() + resList[itm]);
+					if (!fileInfo.data.isDirectory()) {
+						var dotPosition = resList[itm].indexOf('.');
+						var suffix = resList[itm].substr(dotPosition + 1);
+						if ('jpg' == suffix || 'png' == suffix || 'jpeg' == suffix) {
+							var img_tag = '\<div class="item"><img class=\'asset\' id=\'' + resList[itm].substr(0, dotPosition) + '\'>\</img></div>';
+							document.getElementById('content').innerHTML = 
+								document.getElementById('content').innerHTML + img_tag;
+							document.getElementById(resList[itm].substr(0, dotPosition)).src = getTmpFolderPath() + resList[itm];
+							$(".asset").click(function() {
+								window.location.assign('detail.html?' + this.id);
+							});
+						}
+					}
+				}
+			} else {
+				console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+			}
+		}
 		
 		/**
 		 *	Functions for maintaining state of the extension
@@ -70,21 +99,22 @@
 			
 			CSLibrary = new CSInterface();
 			IMSLibrary = new IMSInterface();
-			
-			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
-				if (err) {
-					error_msg(err);
-				}
-				fs.closeSync(fd);
-			});
 		}
 		
 		function main() {
 			login("", "", function(success) {
 				if (success == true) {
 					console.log('----->>> Start to load files. <<<----- main() -----');
+					
+					// Clean up assetsInfo.txt
+					fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+						if (err) {
+							error_msg(err);
+						}
+						fs.closeSync(fd);
+					});
+					
 					loadFiles();
-					//prepareCandidate();
 				} else {
 					// TODO showAAM
 					console.log('Haven\'t Login, should show AAM.');
@@ -186,12 +216,7 @@
 				success: function(collection){
 					console.log('----->>> Get Collection successfully <<<----- retrieveCollection() -----');
 					console.log('assets -->>>' + collection['members']);
-					var limit = 0;
 					for (var itm in collection['members']) {
-						if (limit >= 30 ) {
-							break;
-						}
-						limit++;
 						console.log(itm + ' ----- ' + (collection['members'])[itm]);
 						var assetID = ((collection['members'])[itm])['id'].substring(((collection['members'])[itm])['id'].lastIndexOf('/') + 1);
 						fetchAsset(assetID);
@@ -265,7 +290,9 @@
 					}
 					
 					$(".asset").click(function() {
-						openFileInPS(this.id);
+						//openFileInPS(this.id);
+						console.log('detail.html?' + assetID);
+						window.location.assign('detail.html?' + assetID);
 					});
 					
 					var result = window.cep.fs.writeFile(getTmpFolderPath() + 'asset-' + assetID + '.jpg', base64, cep.encoding.Base64);
@@ -425,51 +452,7 @@
 				if ("undefined" != result || result == EvalScript_ErrMessage ) {
 					alert(result);
 				}
-				// TODO: check for failures
 			});	
-		}
-			
-		/**
-		 * Traverse all files and compute their average value.
-		 */
-		function prepareCandidate() {
-			var script;
-			var dirPath = getTmpFolderPath();
-			var m_directory = window.cep.fs.readdir(dirPath);
-			
-			if (!m_directory['err']) {
-				var fileList = m_directory.data;
-				for (var itm in fileList) {
-					var fileState = window.cep.fs.stat(dirPath + fileList[itm]);
-					if (!fileState.data.isDirectory()) {
-						script = 'app.open(File(\'' + dirPath + fileList[itm] + '\'));';
-						script += '															\
-						if (app.preferences.rulerUnits !== Units.PIXELS) { 			\
-							app.preferences.rulerUnits = Units.PIXELS; 					\
-						} 																	\
-						var docRef = app.activeDocument;									\
-						var rList = docRef.channels.getByName("Red")["histogram"]; 	\
-						var gList = docRef.channels.getByName("Green")["histogram"];	\
-						var bList = docRef.channels.getByName("Blue")["histogram"];	\
-						var sum = 0;														\
-						for (var i = 0; i <= 255; ++i) {									\
-							sum += ((rList[i] * i) + (gList[i] * i) + (bList[i] * i));\
-						}																	\
-						alert((docRef.width * docRef.height) + "aver : " + sum / (docRef.width * docRef.height * 3));	\
-						//var ave = sum / (docRef.width * docRef.height);				\
-						app.activeDocument.close();										\
-						';
-						console.log('----->>> Script: ' + script + ' <<<----- prepareCandidate()');
-						CSLibrary.evalScript(script, function(result) {
-							console.log('----->>> evalScript callback result : ' + result + script + ' <<<-----');
-							if ("undefined" != result || result == EvalScript_ErrMessage ) {
-								alert(result);
-							}
-							// TODO: check for failures
-						});	
-					}
-				}
-			}
 		}
 		
 		/**
@@ -553,6 +536,14 @@
   </head>
 
   <body>
+  	<div class="infoContainer">
+    	<span class="update">
+       		<div id="btnUpdate" class="btn">UPDATE</div> 
+       </span>
+       <span class="updateInfo">
+       		Last Update: <label id="info"></label>
+       </span>
+    </div>
     <div id="container">
       <div id="content">
       </div>

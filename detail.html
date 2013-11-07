@@ -1,0 +1,231 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Image Detail</title>
+    <link href="css/style.css" rel="stylesheet" type="text/css"/>	
+    <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/CSInterface.js"></script>
+    <script>
+		var CSLibrary = new CSInterface();
+		var assetID = location.href.split('?')[1];
+		var tmpFolderPath = null;
+		var blockNum = 3;
+		
+		$(function() {
+			showImage(assetID);
+			
+			$('#btnBack').click(function() {
+				window.location.assign('index.html');
+			});
+			
+			$('#btnGenerate').click(function() {
+				generateMosaic();
+			});
+			
+			$('#btnDoinPS').click(function() {
+				doInPhotoshop(assetID, blockNum);
+			});
+			
+			$('#btnSavetoPS').click(function() {
+				
+			});
+			
+			$('#num').change(function() {
+				blockNum = $('#num').val();
+				console.log(blockNum);
+			});
+			
+		});
+		
+		// Get image
+		function showImage(assetID) {
+			console.log(getTmpFolderPath() + assetID + '.jpg');
+			$('#targetImage').attr('src', getTmpFolderPath() + assetID + '.jpg');
+		}
+		
+		function getTmpFolderPath() {
+			if (tmpFolderPath == null) {
+				tmpFolderPath = CSLibrary.getSystemPath(SystemPath.EXTENSION) + '/tmp/';
+			}
+			
+			return tmpFolderPath;
+		}
+		
+		function generateMosaic() {
+		
+		}
+		
+		function doInPhotoshop(assetID, bnum) {
+			var script = "app.open(File(\'" + getTmpFolderPath() + assetID + '.jpg' + "\'));";
+			
+			script += 'if (app.preferences.rulerUnits !== Units.PIXELS) { 									\n\
+							app.preferences.rulerUnits = Units.PIXELS; 											\n\
+						} 																							\n\
+																													\n\
+						var assetsList = new Array();															\n\
+						var docRef = app.activeDocument;															\n\
+						var docWidth = docRef.width;																\n\
+						var docHeight = docRef.height;															\n\
+						var divides = ' + bnum + ';																\n\
+						var gutter = 0;																			\n\
+						var slotWidth = Math.floor(docWidth / divides);										\n\
+						var slotHeight = Math.floor(docHeight / divides);										\n\
+						var layerRef = docRef.activeLayer;														\n\
+						var x, y;																					\n\
+																													\n\
+						docWidth = slotWidth * divides + gutter * (divides - 1);								\n\
+						docHeight = slotHeight * divides + gutter * (divides - 1);							\n\
+						docRef.resizeImage(docWidth, docHeight);												\n\
+																													\n\
+						function AssetInfo(p_assetID, p_rVector, p_gVector, p_bVector) {						\n\
+							this.assetID = p_assetID;																\n\
+							this.rVector = p_rVector;																\n\
+							this.gVector = p_gVector;																\n\
+							this.bVector = p_bVector;																\n\
+						}																							\n\
+																													\n\
+						function getCorrelation(x, y) {															\n\
+							var xsum = 0;																			\n\
+							var ysum = 0;																			\n\
+							var sum = 0;																			\n\
+							var deltax = 0;																		\n\
+							var deltay = 0;																		\n\
+							for (var i = 0; i < 256; ++i) {														\n\
+								xsum += parseFloat(x[i]);															\n\
+								ysum += parseFloat(y[i]);															\n\
+							}																						\n\
+							/*for (var i = 0; i < 256; ++i) {													\n\
+								x[i] = parseFloat(x[i]) / Math.sqrt(xsum);										\n\
+								y[i] = parseFloat(y[i]) / Math.sqrt(ysum);										\n\
+							}*/																						\n\
+																													\n\
+							var xbar = xsum / 256;																\n\
+							var ybar = ysum / 256;																\n\
+							for (var i = 0; i < 256; ++i) {														\n\
+								sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);					\n\
+								deltax += (parseFloat(x[i]) - xbar) * (parseFloat(x[i]) - xbar);				\n\
+								deltay += (parseFloat(y[i]) - ybar) * (parseFloat(y[i]) - ybar);				\n\
+							}																						\n\
+																													\n\
+							return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));								\n\
+						}																							\n\
+																													\n\
+						function getSimilarImage(rVector, gVector, bVector) {									\n\
+							var minv = -1;																			\n\
+							var minindex = 0;																		\n\
+							var correlation;																		\n\
+							for (var i = 0; i < assetsList.length; ++i) {										\n\
+								var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));\n\
+								var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));\n\
+								var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));\n\
+								correlation = (rcorrelation + gcorrelation + bcorrelation);					\n\
+								if (correlation > minv) {															\n\
+									minv = correlation;															\n\
+									minindex = i;																	\n\
+									if (Math.abs(3 - minv) < 0.000001) {										\n\
+										return assetsList[i].assetID;											\n\
+									}																				\n\
+								}																					\n\
+							}																						\n\
+							return assetsList[minindex].assetID;												\n\
+						}																							\n\
+																													\n\
+						app.documents.add(slotWidth, slotHeight, 72, \'tmp\');									\n\
+						var tmpDoc = app.documents.getByName(\'tmp\');											\n\
+						var fhandle = new File(\'' + getTmpFolderPath() + 'assetsInfo.txt\');					\n\
+																													\n\
+						fhandle.open("r");																		\n\
+																													\n\
+						while (!fhandle.eof) {																	\n\
+							var line = fhandle.readln();															\n\
+							var splitLine = line.split(":")														\n\
+							if ("asset-" + splitLine[0] != \'' + assetID + '\') {								\n\
+								var rlist = new Array(256);														\n\
+								var glist = new Array(256);														\n\
+								var blist = new Array(256);														\n\
+								var k = 0;																			\n\
+								for (var i = 0; i < 256 * 3;) {													\n\
+									rlist[k] = splitLine[i + 1];													\n\
+									glist[k] = splitLine[i + 2];													\n\
+									blist[k] = splitLine[i + 3];													\n\
+									i += 3;																			\n\
+									k++;																			\n\
+								}																					\n\
+								assetsList.push(new AssetInfo(splitLine[0], rlist, glist, blist));			\n\
+							}																						\n\
+						}																							\n\
+																													\n\
+						for (y = docHeight; y > 0; y -= slotHeight) {											\n\
+							for (x = docWidth; x > 0; x -= slotWidth) {											\n\
+								app.activeDocument = docRef;														\n\
+								docRef.activeLayer = layerRef;													\n\
+								docRef.selection.select([															\n\
+									[x - slotWidth, y - slotHeight],												\n\
+									[x, y - slotHeight],															\n\
+									[x, y],																			\n\
+									[x - slotWidth, y]															\n\
+								], SelectionType.REPLACE, 0, false);											\n\
+								docRef.selection.copy();															\n\
+								app.activeDocument = tmpDoc;														\n\
+								tmpDoc.paste();																	\n\
+																													\n\
+								var rList = tmpDoc.channels.getByName("Red")["histogram"];					\n\
+								var gList = tmpDoc.channels.getByName("Green")["histogram"];					\n\
+								var bList = tmpDoc.channels.getByName("Blue")["histogram"];					\n\
+								var tmpID = getSimilarImage(rList, gList, bList);								\n\
+								app.open(File(\'' + getTmpFolderPath() + 'asset-\'+ tmpID + \'.jpg\'));		\n\
+								var tmpDocRef = app.activeDocument;												\n\
+								tmpDocRef.resizeImage(slotWidth, slotHeight);									\n\
+								tmpDocRef.selection.select([														\n\
+									[0, 0],																			\n\
+									[tmpDocRef.width, 0],															\n\
+									[tmpDocRef.width, tmpDocRef.height],										\n\
+									[0, tmpDocRef.height]															\n\
+								], SelectionType.EXTEND, 0, false);												\n\
+								tmpDocRef.selection.copy();														\n\
+								app.activeDocument = docRef;														\n\
+								docRef.activeLayer = layerRef;													\n\
+								docRef.artLayers.add();															\n\
+								docRef.paste();																	\n\
+								tmpDocRef.close(SaveOptions.DONOTSAVECHANGES);									\n\
+								//tmpDoc.artLayers.removeAll();													\n\
+								x -= gutter;																		\n\
+							}																						\n\
+							y -= gutter;																			\n\
+						}																							\n\
+						layerRef.remove();';
+			console.log('----->>> script : ' +  script + ' <<<-----');
+			CSLibrary.evalScript(script, function(result) {
+				console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
+				if ("undefined" != result || result == EvalScript_ErrMessage ) {
+					alert(result);
+				}
+			});	
+		}
+		
+	</script>
+  </head>
+
+  <body>
+  	<div id="detail">
+      <div class="image">
+        <img id="targetImage" class="targetImage" src="#" width="630" />
+      </div>
+      <div class="control">
+      	 <div class="btn" id="btnBack">RESELECT</div>
+        <div class="blank">
+        	Caution:<br />
+           When choose a large block number, it will run for a very long time.
+        </div>
+        <div class="parameter">
+        	<label>Select number of block, the result will square it:</label>
+           <input type="number" id="num" name="num" width="80px" min="3" max="100" value="3" />
+        </div>
+        <div class="btn" id="btnGenerate">GENERATE</div>
+        <div class="btn" id="btnDoinPS">DOINPS</div>
+        <div class="btnInvalid" id="btnSavetoPS">SAVETOPS</div>
+      </div>
+    </div>
+  </body>
+</html>
