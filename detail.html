@@ -6,11 +6,27 @@
     <link href="css/style.css" rel="stylesheet" type="text/css"/>	
     <script type="text/javascript" src="js/jquery.js"></script>
     <script type="text/javascript" src="js/CSInterface.js"></script>
+    <script type="text/javascript" src="js/imagesloaded.js"></script>
+    <script type="text/javascript" src="js/jquery.blockUI.js"></script>
     <script>
+		function AssetInfo(p_assetID, p_rVector, p_gVector, p_bVector) {
+			this.assetID = p_assetID;
+			this.rVector = p_rVector;
+			this.gVector = p_gVector;
+			this.bVector = p_bVector;
+		}			
+	
 		var CSLibrary = new CSInterface();
 		var assetID = location.href.split('?')[1];
 		var tmpFolderPath = null;
+		var fs = require('fs');
 		var blockNum = 3;
+		var assetsList = new Array();
+		var mcanvas = null;
+		var mcontext = null;
+		var mimage = null;
+		var startTime;
+		var endTime;
 		
 		$(function() {
 			showImage(assetID);
@@ -28,20 +44,29 @@
 			});
 			
 			$('#btnSavetoPS').click(function() {
-				
 			});
 			
 			$('#num').change(function() {
 				blockNum = $('#num').val();
-				console.log(blockNum);
 			});
 			
 		});
 		
-		// Get image
+		// Show image
 		function showImage(assetID) {
+			var scale = 1;
+			mcanvas = document.getElementById('targetImage');
+			mcontext = mcanvas.getContext('2d');
+			
 			console.log(getTmpFolderPath() + assetID + '.jpg');
-			$('#targetImage').attr('src', getTmpFolderPath() + assetID + '.jpg');
+			mimage = new Image();
+			mimage.src = getTmpFolderPath() + assetID + '.jpg';
+			mimage.onload = function() {
+				scale = 630 / mimage.width;
+				mcanvas.width = 630;
+				mcanvas.height = mimage.height * scale;
+				mcontext.drawImage(mimage, 0, 0, mimage.width, mimage.height, 0, 0, mcanvas.width, mcanvas.height);
+			};
 		}
 		
 		function getTmpFolderPath() {
@@ -53,7 +78,46 @@
 		}
 		
 		function generateMosaic() {
+			// Block UI
+			var docWidth = mcanvas.width;
+			var docHeight = mcanvas.height;
+			var gutter = 0;					
+			var slotWidth = Math.floor(docWidth / blockNum);
+			var slotHeight = Math.floor(docHeight / blockNum);	
+			var index = slotWidth * slotHeight;
+			var x, y;
+			var imgData = null;
+			var rgbVector;
+			startTime = (new Date()).getTime();
+			setAssetsArray();		//init assetsList
+			
+			for (y = docHeight; y > 0; y -= slotHeight) {	
+				for (x = docWidth; x > 0; x -= slotWidth) {
+					imgData = mcontext.getImageData(x - slotWidth, y - slotHeight, slotWidth, slotHeight);
+					rgbVector = getVector(imgData, index);
+					var tmpID = getSimilarImage(rgbVector[0], rgbVector[1], rgbVector[2]);
 		
+					(function(tx, ty, id) {
+							setTimeout(function () {
+						var tmpImage = new Image();
+						tmpImage.src = getTmpFolderPath() + 'asset-'+ id + '.jpg';
+						tmpImage.onload = function() {
+							mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+						};
+						}, 1000);
+					})(x, y, tmpID);
+					
+					x -= gutter;	
+				}
+				y -= gutter;
+			}
+			
+			// TODO how to judge finished replace.
+			$('#detail').imagesLoaded(function() {
+				$('#btnSavetoPS').css({'background': '#0097E6'});
+				endTime = (new Date()).getTime();
+				console.log('Time elapse: ' + (endTime - startTime));
+			});
 		}
 		
 		function doInPhotoshop(assetID, bnum) {
@@ -204,13 +268,109 @@
 			});	
 		}
 		
+		function setAssetsArray() {
+			var array = fs.readFileSync(getTmpFolderPath() + 'assetsInfo.txt').toString().split('\n');
+			
+			for (var itm in array) {
+				var line = array[itm];
+				var splitLine = line.split(":")
+				var rlist = new Array(256);
+				var glist = new Array(256);
+				var blist = new Array(256);
+				var k = 0;
+				
+				for (var i = 0; i < 256 * 3;) {
+					rlist[k] = splitLine[i + 1];
+					glist[k] = splitLine[i + 2];
+					blist[k] = splitLine[i + 3];
+					i += 3;
+					k++;
+				}
+				
+				assetsList.push(new AssetInfo(splitLine[0], rlist, glist, blist));
+			}
+		}
+		
+		function getCorrelation(x, y) {
+			var xsum = 0;
+			var ysum = 0;
+			var sum = 0;
+			var deltax = 0;	
+			var deltay = 0;	
+			for (var i = 0; i < 256; ++i) {
+				xsum += parseFloat(x[i]);	
+				ysum += parseFloat(y[i]);
+			}
+			
+			/*for (var i = 0; i < 256; ++i) {
+				x[i] = parseFloat(x[i]) / Math.sqrt(xsum);
+				y[i] = parseFloat(y[i]) / Math.sqrt(ysum);
+			}*/	
+			
+			var xbar = xsum / 256;	
+			var ybar = ysum / 256;	
+			for (var i = 0; i < 256; ++i) {
+				sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);
+				deltax += (parseFloat(x[i]) - xbar) * (parseFloat(x[i]) - xbar);
+				deltay += (parseFloat(y[i]) - ybar) * (parseFloat(y[i]) - ybar);
+			}
+			
+			return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));
+		}									
+		
+		function getSimilarImage(rVector, gVector, bVector) {
+			var minv = -1;
+			var minindex = 0;
+			var correlation;
+			for (var i = 0; i < assetsList.length; ++i) {	
+				var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));
+				var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));
+				var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));
+				correlation = (rcorrelation + gcorrelation + bcorrelation);
+				if (correlation > minv) {
+					minv = correlation;
+					minindex = i;
+					if (Math.abs(3 - minv) < 0.0001) {
+						return assetsList[i].assetID;
+					}
+				}
+			}
+			
+			return assetsList[minindex].assetID;
+		}										
+		
+		function getVector(image, index) {
+			var rPart = new Array(256);
+			var gPart = new Array(256);
+			var bPart = new Array(256);
+			var vector = new Array(3);
+			
+			for (var i = 0; i < 256; ++i) {
+				rPart[i] = gPart[i] = bPart[i] = 0;
+			}
+			
+			for (var i = 0; i < index * 4; ++i) {
+				rPart[image.data[i]]++;
+				gPart[image.data[i + 1]]++;
+				bPart[image.data[i + 2]]++;
+				
+				i += 3;
+			}
+			
+			vector[0] = rPart;
+			vector[1] = gPart;
+			vector[2] = bPart;
+			
+			return vector;
+		}
 	</script>
   </head>
 
   <body>
   	<div id="detail">
       <div class="image">
-        <img id="targetImage" class="targetImage" src="#" width="630" />
+        <!--<img id="targetImage" class="targetImage" src="#" width="630" />-->
+        <canvas id="targetImage" class="targetImage" width="630"></canvas>
       </div>
       <div class="control">
       	 <div class="btn" id="btnBack">RESELECT</div>
