@@ -90,27 +90,51 @@
 			var rgbVector;
 			startTime = (new Date()).getTime();
 			setAssetsArray();		//init assetsList
-			
+			var k = 1;
 			for (y = docHeight; y > 0; y -= slotHeight) {	
+				for (x = docWidth; x > 0; x -= slotWidth) {
+					
+		
+					(function(tx, ty) {
+						setTimeout(function () {
+							var simgData = mcontext.getImageData(tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+							var srgbVector = getVector(simgData, index);
+							var tmpID = getSimilarImage(srgbVector[0], srgbVector[1], srgbVector[2]);
+							var tmpImage = new Image();
+							tmpImage.onload = function() {
+								console.log(k + ' ' + new Date());
+								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+							};
+							tmpImage.src = getTmpFolderPath() + 'asset-'+ tmpID + '.jpg';
+						}, k * 100);
+					})(x, y);
+					k++;
+					x -= gutter;
+				}
+				y -= gutter;
+			}
+			/*for (y = docHeight; y > 0; y -= slotHeight) {	
 				for (x = docWidth; x > 0; x -= slotWidth) {
 					imgData = mcontext.getImageData(x - slotWidth, y - slotHeight, slotWidth, slotHeight);
 					rgbVector = getVector(imgData, index);
 					var tmpID = getSimilarImage(rgbVector[0], rgbVector[1], rgbVector[2]);
 		
 					(function(tx, ty, id) {
-							setTimeout(function () {
-						var tmpImage = new Image();
-						tmpImage.src = getTmpFolderPath() + 'asset-'+ id + '.jpg';
-						tmpImage.onload = function() {
-							mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
-						};
-						}, 1000);
+						setTimeout(function () {
+							var tmpImage = new Image();
+							tmpImage.onload = function() {
+								console.log(k + ' ' + new Date());
+								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+							};
+							tmpImage.src = getTmpFolderPath() + 'asset-'+ id + '.jpg';
+						}, k * 100);
 					})(x, y, tmpID);
-					
-					x -= gutter;	
+					k++;
+					x -= gutter;
+					setTimeout(function(){console.log('here');}, 100);	
 				}
 				y -= gutter;
-			}
+			}*/
 			
 			// TODO how to judge finished replace.
 			$('#detail').imagesLoaded(function() {
@@ -326,7 +350,11 @@
 				var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));
 				var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));
 				var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));
-				correlation = (rcorrelation + gcorrelation + bcorrelation);
+				correlation = 2 * (rcorrelation + gcorrelation + bcorrelation);
+				correlation += Math.max(rcorrelation, gcorrelation, bcorrelation);
+				correlation -= Math.min(rcorrelation, gcorrelation, bcorrelation);
+				correlation /= 2;
+				
 				if (correlation > minv) {
 					minv = correlation;
 					minindex = i;

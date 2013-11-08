@@ -28,6 +28,7 @@
 			init();
 			//main();
 			showImages();
+			//prepareImage();
 			var $cnter = $('#content');
 			$cnter.imagesLoaded(function() {
 				$cnter.masonry({
@@ -45,6 +46,46 @@
 				main();
 			});
         });
+		
+		function prepareImage() {
+			// Clean up assetsInfo.txt
+			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+				if (err) {
+					error_msg(err);
+				}
+				fs.closeSync(fd);
+			});
+			
+			var result = window.cep.fs.readdir(getTmpFolderPath() + 'images/');
+			if (!result['err']) {
+				var resList = result.data;
+				for (var itm in resList) {
+					var fileInfo = window.cep.fs.stat(getTmpFolderPath() + 'images/' + resList[itm]);
+					if (!fileInfo.data.isDirectory()) {
+						var dotPosition = resList[itm].indexOf('.');
+						var suffix = resList[itm].substr(dotPosition + 1);
+						if ('jpg' == suffix || 'png' == suffix || 'jpeg' == suffix) {
+							(function( id, dot ){
+							var imgInfo = new Image();
+							imgInfo.src = getTmpFolderPath() + 'images/' + id;
+							imgInfo.onload = function() {
+								document.getElementById('can').width = imgInfo.width;
+								document.getElementById('can').height = imgInfo.height;
+								var context = document.getElementById('can').getContext('2d');
+								context.drawImage(imgInfo, 0, 0, imgInfo.width, imgInfo.height, 0 , 0, imgInfo.width, imgInfo.height);
+								var imgData = context.getImageData(0, 0, imgInfo.width, imgInfo.height);
+								var index = imgInfo.height * imgInfo.width;
+								console.log('--->' + id.substr(0, dot));
+								writeAssetsInfo(id.substr(0, dot) + getVector(imgData, index) + '\n');
+							}
+							})(resList[itm], dotPosition);
+						}
+					}
+				}
+			} else {
+				console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+			}
+		}
 		
 		/**
 		 * The default method for showing images. The files from local folder.
