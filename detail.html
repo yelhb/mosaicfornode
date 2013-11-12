@@ -8,6 +8,7 @@
     <script type="text/javascript" src="js/CSInterface.js"></script>
     <script type="text/javascript" src="js/imagesloaded.js"></script>
     <script type="text/javascript" src="js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="js/jquery.percentageloader.min.js"></script>
     <script>
 		function AssetInfo(p_assetID, p_rVector, p_gVector, p_bVector) {
 			this.assetID = p_assetID;
@@ -27,9 +28,16 @@
 		var mimage = null;
 		var startTime;
 		var endTime;
+		var lprocess;
 		
 		$(function() {
 			showImage(assetID);
+			lprocess = $('#loadprocess').percentageLoader({
+				width : 80, 
+				height : 80, 
+				progress : 0, 
+				value : ''}
+			);
 			
 			$('#btnBack').click(function() {
 				window.location.assign('index.html');
@@ -44,6 +52,7 @@
 			});
 			
 			$('#btnSavetoPS').click(function() {
+				saveToPS(assetID);
 			});
 			
 			$('#num').change(function() {
@@ -77,13 +86,18 @@
 			return tmpFolderPath;
 		}
 		
+		function getReslutFolderPath() {
+			window.cep.fs.makedir(CSLibrary.getSystemPath(SystemPath.EXTENSION) + '/tmp/result/');
+			return CSLibrary.getSystemPath(SystemPath.EXTENSION) + '/tmp/result/';
+		}
+		
 		function generateMosaic() {
 			// Block UI
 			var docWidth = mcanvas.width;
 			var docHeight = mcanvas.height;
 			var gutter = 0;					
 			var slotWidth = Math.floor(docWidth / blockNum);
-			var slotHeight = Math.floor(docHeight / blockNum);	
+			var slotHeight = Math.floor(docHeight / blockNum);
 			var index = slotWidth * slotHeight;
 			var x, y;
 			var imgData = null;
@@ -93,48 +107,24 @@
 			var k = 1;
 			for (y = docHeight; y > 0; y -= slotHeight) {	
 				for (x = docWidth; x > 0; x -= slotWidth) {
-					
-		
-					(function(tx, ty) {
+					(function(tx, ty, n) {
 						setTimeout(function () {
 							var simgData = mcontext.getImageData(tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
 							var srgbVector = getVector(simgData, index);
 							var tmpID = getSimilarImage(srgbVector[0], srgbVector[1], srgbVector[2]);
 							var tmpImage = new Image();
 							tmpImage.onload = function() {
-								console.log(k + ' ' + new Date());
 								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+								lprocess.setProgress( n / (blockNum * blockNum));
 							};
 							tmpImage.src = getTmpFolderPath() + 'asset-'+ tmpID + '.jpg';
-						}, k * 100);
-					})(x, y);
+						}, k * 70);
+					})(x, y, k);
 					k++;
 					x -= gutter;
 				}
 				y -= gutter;
 			}
-			/*for (y = docHeight; y > 0; y -= slotHeight) {	
-				for (x = docWidth; x > 0; x -= slotWidth) {
-					imgData = mcontext.getImageData(x - slotWidth, y - slotHeight, slotWidth, slotHeight);
-					rgbVector = getVector(imgData, index);
-					var tmpID = getSimilarImage(rgbVector[0], rgbVector[1], rgbVector[2]);
-		
-					(function(tx, ty, id) {
-						setTimeout(function () {
-							var tmpImage = new Image();
-							tmpImage.onload = function() {
-								console.log(k + ' ' + new Date());
-								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
-							};
-							tmpImage.src = getTmpFolderPath() + 'asset-'+ id + '.jpg';
-						}, k * 100);
-					})(x, y, tmpID);
-					k++;
-					x -= gutter;
-					setTimeout(function(){console.log('here');}, 100);	
-				}
-				y -= gutter;
-			}*/
 			
 			// TODO how to judge finished replace.
 			$('#detail').imagesLoaded(function() {
@@ -227,7 +217,7 @@
 																													\n\
 						while (!fhandle.eof) {																	\n\
 							var line = fhandle.readln();															\n\
-							var splitLine = line.split(":")														\n\
+							var splitLine = line.split(":");														\n\
 							if ("asset-" + splitLine[0] != \'' + assetID + '\') {								\n\
 								var rlist = new Array(256);														\n\
 								var glist = new Array(256);														\n\
@@ -292,6 +282,23 @@
 			});	
 		}
 		
+		function saveToPS(id) {
+			var tourl = mcanvas.toDataURL('image/jpeg');
+			var result = window.cep.fs.writeFile(getReslutFolderPath() + id + '.jpg', tourl.substr(23), window.cep.encoding.Base64);
+			if (result.err != 0) {
+				alert(result.err);
+			}
+			
+			var script = "app.open(File(\'" + getReslutFolderPath() + id + '.jpg' + "\'));";
+			
+			CSLibrary.evalScript(script, function(result) {
+				console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
+				if ("undefined" != result || result == EvalScript_ErrMessage ) {
+					alert(result);
+				}
+			});	
+		}
+		
 		function setAssetsArray() {
 			var array = fs.readFileSync(getTmpFolderPath() + 'assetsInfo.txt').toString().split('\n');
 			
@@ -316,6 +323,31 @@
 		}
 		
 		function getCorrelation(x, y) {
+			var xysum = 0;
+			var xsum = 0;
+			var ysum = 0;
+			var xssum = 0;
+			var yssum = 0;
+			
+			for (var i = 0; i < 256; ++i) {
+				var tmpx = parseFloat(x[i]);
+				var tmpy = parseFloat(y[i]);
+				xysum += tmpx * tmpy;
+				xsum += tmpx;
+				ysum += tmpy;
+				xssum += tmpx * tmpx;
+				yssum += tmpy * tmpy;
+			}
+			
+			var member = (xysum - (xsum * ysum) / 256);
+			var deltax = (xssum - xsum * xsum / 256) ;
+			var deltay =(yssum - ysum * ysum / 256);
+			var denominator = Math.sqrt( deltax * deltay );
+			//console.log('correlation : ' + (member / denominator));
+			return member / denominator;
+		}	
+		
+		/*function getCorrelation(x, y) {
 			var xsum = 0;
 			var ysum = 0;
 			var sum = 0;
@@ -331,7 +363,7 @@
 				y[i] = parseFloat(y[i]) / Math.sqrt(ysum);
 			}*/	
 			
-			var xbar = xsum / 256;	
+			/*var xbar = xsum / 256;	
 			var ybar = ysum / 256;	
 			for (var i = 0; i < 256; ++i) {
 				sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);
@@ -340,30 +372,31 @@
 			}
 			
 			return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));
-		}									
+		}	*/							
 		
 		function getSimilarImage(rVector, gVector, bVector) {
-			var minv = -1;
+			var minv = -3;
 			var minindex = 0;
 			var correlation;
 			for (var i = 0; i < assetsList.length; ++i) {	
-				var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));
-				var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));
-				var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));
-				correlation = 2 * (rcorrelation + gcorrelation + bcorrelation);
-				correlation += Math.max(rcorrelation, gcorrelation, bcorrelation);
-				correlation -= Math.min(rcorrelation, gcorrelation, bcorrelation);
-				correlation /= 2;
-				
+				var rcorrelation = (getCorrelation(rVector, assetsList[i].rVector));
+				var gcorrelation = (getCorrelation(gVector, assetsList[i].gVector));
+				var bcorrelation = (getCorrelation(bVector, assetsList[i].bVector));
+				correlation = (rcorrelation + gcorrelation + bcorrelation);
+				/*correlation += 5 * Math.max(rcorrelation, gcorrelation, bcorrelation);
+				correlation -= 5 * Math.min(rcorrelation, gcorrelation, bcorrelation);
+				correlation /= 10;*/
+				console.log('      ->' + correlation + ' : ' + assetsList[i].assetID);
 				if (correlation > minv) {
 					minv = correlation;
 					minindex = i;
-					if (Math.abs(3 - minv) < 0.0001) {
+					if (3 - minv < 0.000001) {
 						return assetsList[i].assetID;
 					}
 				}
 			}
 			
+			console.log('similarImage: ' + assetsList[minindex].assetID + ' -- ' + minv);
 			return assetsList[minindex].assetID;
 		}										
 		
@@ -406,14 +439,18 @@
         	Caution:<br />
            When choose a large block number, it will run for a very long time.
         </div>
+        <div id="loadprocess">
+        </div>
         <div class="parameter">
         	<label>Select number of block, the result will square it:</label>
-           <input type="number" id="num" name="num" width="80px" min="3" max="100" value="3" />
+           <input type="number" id="num" name="num" width="80px" min="1" max="200" value="3" />
         </div>
         <div class="btn" id="btnGenerate">GENERATE</div>
         <div class="btn" id="btnDoinPS">DOINPS</div>
         <div class="btnInvalid" id="btnSavetoPS">SAVETOPS</div>
       </div>
     </div>
+    <canvas id="download" style="display:none;"></canvas>
+    <img id="test"/>
   </body>
 </html>

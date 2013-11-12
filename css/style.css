@@ -112,11 +112,19 @@ body {
 }
 
 #detail .blank {
-	height: 185px;
+	height: 85px;
 	width: 90px;
 	margin: 8px;
 	font-size: 14px;
 	color: #EDEDED;
+}
+
+#detail #loadprocess {
+	width: 83px;
+	height: 85px;
+	padding-top: 15px;
+	padding-left: 7px;
+	margin: 8px;
 }
 
 #detail .parameter {
