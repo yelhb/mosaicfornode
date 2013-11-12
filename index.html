@@ -18,13 +18,16 @@
 		var tmpFolderPath = null;
 		var access_token = null;
 		var assetsList = new Array();
+		var $cnter = null;
+		var assetsNum = 0;
+		var assetsAll = 0;
 		
 		$(document).ready(function() {
 			
 			init();
 			//main();
 			showImages();
-			var $cnter = $('#content');
+			$cnter = $('#content');
 			$cnter.imagesLoaded(function() {
 				$cnter.masonry({
 					itemSelector : '.item',
@@ -43,30 +46,30 @@
         });
 		
 		/**
-		 * Tool function, to construct assetsInfo from local folder (extensionPath/tmp/images)
+		 * Tool function, to construct assetsInfo from local folder (extensionPath/tmp)
 		 */
 		function prepareImage() {
 			
 			// Clean up assetsInfo.txt
-			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+			/*fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
 				if (err) {
 					error_msg(err);
 				}
 				fs.closeSync(fd);
-			});
+			});*/
 			
-			var result = window.cep.fs.readdir(getTmpFolderPath() + 'images/');
+			var result = window.cep.fs.readdir(getTmpFolderPath());
 			if (!result['err']) {
 				var resList = result.data;
 				for (var itm in resList) {
-					var fileInfo = window.cep.fs.stat(getTmpFolderPath() + 'images/' + resList[itm]);
+					var fileInfo = window.cep.fs.stat(getTmpFolderPath() + resList[itm]);
 					if (!fileInfo.data.isDirectory()) {
 						var dotPosition = resList[itm].indexOf('.');
 						var suffix = resList[itm].substr(dotPosition + 1);
-						if ('jpg' == suffix || 'png' == suffix || 'jpeg' == suffix) {
+						if ('jpg' == suffix || 'jpeg' == suffix) {
 							(function( id, dot ){
 							var imgInfo = new Image();
-							imgInfo.src = getTmpFolderPath() + 'images/' + id;
+							imgInfo.src = getTmpFolderPath() + id;
 							imgInfo.onload = function() {
 								document.getElementById('can').width = imgInfo.width;
 								document.getElementById('can').height = imgInfo.height;
@@ -74,7 +77,7 @@
 								context.drawImage(imgInfo, 0, 0, imgInfo.width, imgInfo.height, 0 , 0, imgInfo.width, imgInfo.height);
 								var imgData = context.getImageData(0, 0, imgInfo.width, imgInfo.height);
 								var index = imgInfo.height * imgInfo.width;
-								console.log('--->' + id.substr(0, dot));
+								//console.log('--->' + id.substr(0, dot));
 								writeAssetsInfo(id.substr(0, dot) + getVector(imgData, index) + '\n');
 							}
 							})(resList[itm], dotPosition);
@@ -82,7 +85,8 @@
 					}
 				}
 			} else {
-				console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+				//console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+				error_msg(result['err']);
 			}
 		}
 		
@@ -99,7 +103,7 @@
 					if (!fileInfo.data.isDirectory()) {
 						var dotPosition = resList[itm].indexOf('.');
 						var suffix = resList[itm].substr(dotPosition + 1);
-						if ('jpg' == suffix || 'png' == suffix || 'jpeg' == suffix) {
+						if ('jpg' == suffix || 'jpeg' == suffix) {
 							var img_tag = '\<div class="item"><img class=\'asset\' id=\'' + resList[itm].substr(0, dotPosition) + '\'>\</img></div>';
 							document.getElementById('content').innerHTML = 
 								document.getElementById('content').innerHTML + img_tag;
@@ -111,7 +115,8 @@
 					}
 				}
 			} else {
-				console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+				//console.log('----->>> error in showImages() :' + result['err'] + ' <<<-----');
+				error_msg(result['err']);
 			}
 		}
 		
@@ -145,20 +150,23 @@
 			
 			login("", "", function(success) {
 				if (success == true) {
-					console.log('----->>> Start to load files. <<<----- main() -----');
+					//console.log('----->>> Start to load files. <<<----- main() -----');
 					
 					// Clean up assetsInfo.txt
-					fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+					/*fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
 						if (err) {
 							error_msg(err);
 						}
 						fs.closeSync(fd);
-					});
+					});*/
 					
+					setAssetsArray();
 					loadFiles();
+					$cnter.imagesLoaded(function() {});
 				} else {
 					// TODO showAAM
-					console.log('Haven\'t Login, should show AAM.');
+					alert('Please Login from Web Page.');
+					//console.log('Haven\'t Login, should show AAM.');
 				}
 			});
 		}
@@ -214,7 +222,7 @@
 		function loadFiles() {
 			
 			var collectionUrl = 'collections/';	
-			console.log('----->>> collectionUrl : ' + collectionUrl + '<<<----- loadFiles() -----');
+			//console.log('----->>> collectionUrl : ' + collectionUrl + '<<<----- loadFiles() -----');
 			
 			$.ajax({
 				method: "GET",
@@ -225,7 +233,7 @@
 					"Authorization" : token_type + ' ' + access_token
 				},
 				success: function(collections) {
-					console.log('----->>> Get collections successfully <<<----- loadFiles() -----');
+					//console.log('----->>> Get collections successfully <<<----- loadFiles() -----');
 					for (var i = 0; i < collections.length; ++i ) {
 						// All user's files in root collection whose name is null;
 						// Caution: under this collection, folder and files will be mixed.
@@ -258,12 +266,14 @@
 					"Authorization" : token_type + ' ' + access_token
 				},
 				success: function(collection){
-					console.log('----->>> Get Collection successfully <<<----- retrieveCollection() -----');
-					console.log('assets -->>>' + collection['members']);
+					//console.log('----->>> Get Collection successfully <<<----- retrieveCollection() -----');
+					//console.log('assets -->>>' + collection['members']);
 					for (var itm in collection['members']) {
-						console.log(itm + ' ----- ' + (collection['members'])[itm]);
+						//console.log(itm + ' ----- ' + (collection['members'])[itm]);
 						var assetID = ((collection['members'])[itm])['id'].substring(((collection['members'])[itm])['id'].lastIndexOf('/') + 1);
-						fetchAsset(assetID);
+						if (!isAssetExist(assetID)) {
+							fetchAsset(assetID, itm);
+						}
 					}
 				},
 				error: function(xhr, errStatus, errDesc) {
@@ -278,10 +288,9 @@
 		 * TODO : fetch thumbnails instead of full-size images
 		 * @see Get Asset API: https://stage.adobecc.com/developer/Resources/api/assets/%7Basset-id%7D/GET.html
 		 */
-		function fetchAsset(assetID) {
-			
+		function fetchAsset(assetID, order) {
 			var url = cc_url + "assets/" + assetID;
-			console.log('----->>> asset URL : ' + url + ' <<<----- fetchAsset() -----');
+			//console.log('----->>> asset URL : ' + url + ' <<<----- fetchAsset() -----');
 			var xhr = new XMLHttpRequest();
 			xhr.open('GET', url, true);
 			try{
@@ -291,8 +300,10 @@
 			}
 			
 			xhr.setRequestHeader('Authorization', token_type + ' ' + access_token);
+			assetsNum++;
+			assetsAll++;
 			xhr.onload = function(e) {
-				if (this.status == 200 || this.status == 304) {
+				if ((this.status == 200 || this.status == 304) && 'image/jpeg' == this.getResponseHeader('Content-Type')) {
 					var uInt8Array = new Uint8Array(this.response);
 					var i = uInt8Array.length;
 					var binaryString = new Array(i);
@@ -303,9 +314,12 @@
 					var data = binaryString.join('');
 					var base64 = window.btoa(data);
 					var img_tag = generateImgTag(assetID);
-					document.getElementById('content').innerHTML = 
+					/*document.getElementById('content').innerHTML = 
 						document.getElementById('content').innerHTML + img_tag;
-					document.getElementById('asset-' + assetID).src = 'data:image/png;base64,' + base64;
+					document.getElementById('asset-' + assetID).src = 'data:image/png;base64,' + base64;*/
+					document.getElementById('content').innerHTML = 
+								document.getElementById('content').innerHTML + img_tag;
+					document.getElementById('asset-' + assetID).src = getTmpFolderPath() + 'asset-' + assetID + '.jpg';
 					
 					// compute each img
 					var imgInfo = new Image();
@@ -321,14 +335,20 @@
 					}
 					
 					$(".asset").click(function() {
-						console.log('----->>> Redirect to : detail.html?' + assetID + '<<<-----');
-						window.location.assign('detail.html?' + assetID);
+						//console.log('----->>> Redirect to : detail.html?' + assetID + '<<<-----');
+						window.location.assign('detail.html?asset-' + assetID);
 					});
 					
 					var result = window.cep.fs.writeFile(getTmpFolderPath() + 'asset-' + assetID + '.jpg', base64, cep.encoding.Base64);
 					if (result.err != 0) {
 						error_msg(result.err);
 					}
+				}
+				assetsNum--;
+				$('#updateProcess').css('width', Math.floor((assetsAll - assetsNum) * 100 / assetsAll) + '%');
+				if (0 == assetsNum) {
+					console.log ('method calling...');
+					window.location.assign('index.html');
 				}
 			};
 			
@@ -339,6 +359,16 @@
 		 * Write assetsList to file. So that PS extendScript can read info.
 		 */
 		function writeAssetsInfo(info) {
+			fs.exists(getTmpFolderPath() + 'assetsInfo.txt', function(exists) {
+				if (!exists) {
+					fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+						if (err) {
+							error_msg(err);
+						}
+						fs.closeSync(fd);
+					});
+				}
+			});
 			
 			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'a+', function(err, fd) {
 				if (err) {
@@ -350,12 +380,12 @@
 					if (err) {
 						error_msg(err);
 					}
-					console.log('----->>> written buffer Size:' + written + ' <<<----- writeAssetsInfo() ');
+					//console.log('----->>> written buffer Size:' + written + ' <<<----- writeAssetsInfo() ');
 				});
 				
 				setTimeout(function() {
 					fs.closeSync(fd);
-				}, 1000);
+				}, 200);
 			});
 		}
 		
@@ -385,6 +415,30 @@
 		function error_msg(errorMsg) {
 			
 			alert(errorMsg);
+		}
+		
+		function setAssetsArray() {
+			fs.exists(getTmpFolderPath() + 'assetsInfo.txt', function(exists) {
+				if (exists) {
+					var array = fs.readFileSync(getTmpFolderPath() + 'assetsInfo.txt').toString().split('\n');
+			
+					for (var itm in array) {
+						var line = array[itm];
+						var splitLine = line.split(":");
+						
+						assetsList.push(splitLine[0]);
+					}
+				}
+			});
+		}
+		
+		function isAssetExist(id) {
+			for (itm in assetsList) {
+				if (id == assetsList[itm]) {
+					return true;
+				}
+			}
+			return false;
 		}
 		
 		function getVector(image, index) {
@@ -426,7 +480,7 @@
        		<div id="btnUpdate" class="btn">UPDATE</div> 
        </span>
        <span class="updateInfo">
-       		Last Update: <label id="info"></label>
+       		<div id="updateProcess" class="updateProcess"></div>
        </span>
     </div>
     <div id="container">

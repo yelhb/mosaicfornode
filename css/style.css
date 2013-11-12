@@ -50,8 +50,19 @@ body {
 .updateInfo {
 	color: #E5E5E5;
 	font-size: 16px;
-	padding-top: 5px;
+	width: 370px;
+	height: 16px;
+	padding: 2px;
+	margin-top: 3px;
+	margin-right: 270px;
+	border: 1px solid #C2C2C2;
 	float: right;
+}
+
+.updateProcess {
+	height: 16px;
+	background: #0097FF;
+	width: 0%;
 }
 
 #container {

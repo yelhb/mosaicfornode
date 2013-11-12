@@ -115,10 +115,12 @@
 							var tmpImage = new Image();
 							tmpImage.onload = function() {
 								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
-								lprocess.setProgress( n / (blockNum * blockNum));
+								setTimeout(function() {
+									lprocess.setProgress( n / (blockNum * blockNum));
+								}, n * 20);
 							};
 							tmpImage.src = getTmpFolderPath() + 'asset-'+ tmpID + '.jpg';
-						}, k * 70);
+						}, k * 80);
 					})(x, y, k);
 					k++;
 					x -= gutter;
@@ -130,7 +132,7 @@
 			$('#detail').imagesLoaded(function() {
 				$('#btnSavetoPS').css({'background': '#0097E6'});
 				endTime = (new Date()).getTime();
-				console.log('Time elapse: ' + (endTime - startTime));
+				//console.log('Time elapse: ' + (endTime - startTime));
 			});
 		}
 		
@@ -164,29 +166,27 @@
 						}																							\n\
 																													\n\
 						function getCorrelation(x, y) {															\n\
+							var xysum = 0;																			\n\
 							var xsum = 0;																			\n\
 							var ysum = 0;																			\n\
-							var sum = 0;																			\n\
-							var deltax = 0;																		\n\
-							var deltay = 0;																		\n\
-							for (var i = 0; i < 256; ++i) {														\n\
-								xsum += parseFloat(x[i]);															\n\
-								ysum += parseFloat(y[i]);															\n\
-							}																						\n\
-							/*for (var i = 0; i < 256; ++i) {													\n\
-								x[i] = parseFloat(x[i]) / Math.sqrt(xsum);										\n\
-								y[i] = parseFloat(y[i]) / Math.sqrt(ysum);										\n\
-							}*/																						\n\
+							var xssum = 0;																			\n\
+							var yssum = 0;																			\n\
 																													\n\
-							var xbar = xsum / 256;																\n\
-							var ybar = ysum / 256;																\n\
 							for (var i = 0; i < 256; ++i) {														\n\
-								sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);					\n\
-								deltax += (parseFloat(x[i]) - xbar) * (parseFloat(x[i]) - xbar);				\n\
-								deltay += (parseFloat(y[i]) - ybar) * (parseFloat(y[i]) - ybar);				\n\
+								var tmpx = parseFloat(x[i]);														\n\
+								var tmpy = parseFloat(y[i]);														\n\
+								xysum += tmpx * tmpy;																\n\
+								xsum += tmpx;																		\n\
+								ysum += tmpy;																		\n\
+								xssum += tmpx * tmpx;																\n\
+								yssum += tmpy * tmpy;																\n\
 							}																						\n\
 																													\n\
-							return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));								\n\
+							var member = (xysum - (xsum * ysum) / 256);											\n\
+							var deltax = (xssum - xsum * xsum / 256) ;											\n\
+							var deltay =(yssum - ysum * ysum / 256);											\n\
+							var denominator = Math.sqrt( deltax * deltay );									\n\
+							return member / denominator;															\n\
 						}																							\n\
 																													\n\
 						function getSimilarImage(rVector, gVector, bVector) {									\n\
@@ -194,10 +194,10 @@
 							var minindex = 0;																		\n\
 							var correlation;																		\n\
 							for (var i = 0; i < assetsList.length; ++i) {										\n\
-								var rcorrelation = Math.abs(getCorrelation(rVector, assetsList[i].rVector));\n\
-								var gcorrelation = Math.abs(getCorrelation(gVector, assetsList[i].gVector));\n\
-								var bcorrelation = Math.abs(getCorrelation(bVector, assetsList[i].bVector));\n\
-								correlation = (rcorrelation + gcorrelation + bcorrelation);					\n\
+								var rcorrelation = getCorrelation(rVector, assetsList[i].rVector);			\n\
+								var gcorrelation = getCorrelation(gVector, assetsList[i].gVector);			\n\
+								var bcorrelation = getCorrelation(bVector, assetsList[i].bVector);			\n\
+								correlation = rcorrelation + gcorrelation + bcorrelation;						\n\
 								if (correlation > minv) {															\n\
 									minv = correlation;															\n\
 									minindex = i;																	\n\
@@ -273,9 +273,9 @@
 							y -= gutter;																			\n\
 						}																							\n\
 						layerRef.remove();';
-			console.log('----->>> script : ' +  script + ' <<<-----');
+			//console.log('----->>> script : ' +  script + ' <<<-----');
 			CSLibrary.evalScript(script, function(result) {
-				console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
+				//console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
 				if ("undefined" != result || result == EvalScript_ErrMessage ) {
 					alert(result);
 				}
@@ -292,7 +292,7 @@
 			var script = "app.open(File(\'" + getReslutFolderPath() + id + '.jpg' + "\'));";
 			
 			CSLibrary.evalScript(script, function(result) {
-				console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
+				//console.log('----->>> evalScript callback result : ' + result + ' <<<-----');
 				if ("undefined" != result || result == EvalScript_ErrMessage ) {
 					alert(result);
 				}
@@ -304,7 +304,7 @@
 			
 			for (var itm in array) {
 				var line = array[itm];
-				var splitLine = line.split(":")
+				var splitLine = line.split(":");
 				var rlist = new Array(256);
 				var glist = new Array(256);
 				var blist = new Array(256);
@@ -343,7 +343,6 @@
 			var deltax = (xssum - xsum * xsum / 256) ;
 			var deltay =(yssum - ysum * ysum / 256);
 			var denominator = Math.sqrt( deltax * deltay );
-			//console.log('correlation : ' + (member / denominator));
 			return member / denominator;
 		}	
 		
@@ -383,10 +382,9 @@
 				var gcorrelation = (getCorrelation(gVector, assetsList[i].gVector));
 				var bcorrelation = (getCorrelation(bVector, assetsList[i].bVector));
 				correlation = (rcorrelation + gcorrelation + bcorrelation);
-				/*correlation += 5 * Math.max(rcorrelation, gcorrelation, bcorrelation);
-				correlation -= 5 * Math.min(rcorrelation, gcorrelation, bcorrelation);
-				correlation /= 10;*/
-				console.log('      ->' + correlation + ' : ' + assetsList[i].assetID);
+				
+				//console.log('      ->' + correlation + ' : ' + assetsList[i].assetID);
+				
 				if (correlation > minv) {
 					minv = correlation;
 					minindex = i;
@@ -396,7 +394,7 @@
 				}
 			}
 			
-			console.log('similarImage: ' + assetsList[minindex].assetID + ' -- ' + minv);
+			//console.log('similarImage: ' + assetsList[minindex].assetID + ' -- ' + minv);
 			return assetsList[minindex].assetID;
 		}										
 		
@@ -450,7 +448,5 @@
         <div class="btnInvalid" id="btnSavetoPS">SAVETOPS</div>
       </div>
     </div>
-    <canvas id="download" style="display:none;"></canvas>
-    <img id="test"/>
   </body>
 </html>
