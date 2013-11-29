@@ -51,12 +51,12 @@
 		function prepareImage() {
 			
 			// Clean up assetsInfo.txt
-			/*fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
+			fs.open(getTmpFolderPath() + 'assetsInfo.txt', 'w', function(err, fd) {
 				if (err) {
 					error_msg(err);
 				}
 				fs.closeSync(fd);
-			});*/
+			});
 			
 			var result = window.cep.fs.readdir(getTmpFolderPath());
 			if (!result['err']) {

@@ -80,7 +80,13 @@ body {
 
 /************** Style For Detail Page *****************/
 #targetImage {
+	position: absolute;
 	border: 10px solid #FFFFFF;
+}
+
+#mosaicImages {
+	position: absolute;
+	border: 10px solid #B5B5B5;
 }
 
 .image {

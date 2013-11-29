@@ -24,8 +24,11 @@
 		var blockNum = 3;
 		var assetsList = new Array();
 		var mcanvas = null;
+		var tcanvas = null;
 		var mcontext = null;
+		var tcontext = null;
 		var mimage = null;
+		var timage = null;
 		var startTime;
 		var endTime;
 		var lprocess;
@@ -64,18 +67,33 @@
 		// Show image
 		function showImage(assetID) {
 			var scale = 1;
-			mcanvas = document.getElementById('targetImage');
+			mcanvas = document.getElementById('mosaicImages');
+			tcanvas = document.getElementById('targetImage');
 			mcontext = mcanvas.getContext('2d');
+			tcontext = tcanvas.getContext('2d');
 			
-			console.log(getTmpFolderPath() + assetID + '.jpg');
+			//console.log(getTmpFolderPath() + assetID + '.jpg');
 			mimage = new Image();
-			mimage.src = getTmpFolderPath() + assetID + '.jpg';
+			timage = new Image();
+			
 			mimage.onload = function() {
 				scale = 630 / mimage.width;
 				mcanvas.width = 630;
 				mcanvas.height = mimage.height * scale;
 				mcontext.drawImage(mimage, 0, 0, mimage.width, mimage.height, 0, 0, mcanvas.width, mcanvas.height);
 			};
+			mimage.src = getTmpFolderPath() + assetID + '.jpg';
+			
+			timage.onload = function() {
+				scale = 630 / timage.width;
+				tcanvas.width = 630;
+				tcanvas.height = timage.height * scale;
+				tcontext.globalAlpha = 0.6;
+				tcontext.drawImage(timage, 0, 0, timage.width, timage.height, 0, 0, tcanvas.width, tcanvas.height);
+				//setAlpha(tcontext, tcanvas.width, tcanvas.height);
+				tcontext.globalAlpha = 0.7;
+			}
+			timage.src = getTmpFolderPath() + assetID + '.jpg';
 		}
 		
 		function getTmpFolderPath() {
@@ -110,6 +128,17 @@
 					(function(tx, ty, n) {
 						setTimeout(function () {
 							var simgData = mcontext.getImageData(tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+							// Select images randomly.
+							/*var tmpID = getImageRandom();
+							var tmpImage = new Image();
+							tmpImage.onload = function() {
+								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
+								setTimeout(function() {
+									lprocess.setProgress( n / (blockNum * blockNum));
+							   }, 10);
+							}*/
+							
+							// Select images by calculating Pearson's correlation coefficlent.
 							var srgbVector = getVector(simgData, index);
 							var tmpID = getSimilarImage(srgbVector[0], srgbVector[1], srgbVector[2]);
 							var tmpImage = new Image();
@@ -117,10 +146,13 @@
 								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
 								setTimeout(function() {
 									lprocess.setProgress( n / (blockNum * blockNum));
-								}, n * 20);
+								}, n * 5);
 							};
-							tmpImage.src = getTmpFolderPath() + 'asset-'+ tmpID + '.jpg';
-						}, k * 80);
+							if (tmpID.substr(0, 5) != 'asset' ) {
+								tmpID = 'asset-' + tmpID;
+							}
+							tmpImage.src = getTmpFolderPath() + tmpID + '.jpg';
+						}, k * 40);
 					})(x, y, k);
 					k++;
 					x -= gutter;
@@ -283,6 +315,11 @@
 		}
 		
 		function saveToPS(id) {
+			//mcontext.globalCompositeOperation = "source-over";
+			//var imageData = tcontext.getImageData(0, 0, mcanvas.width, mcanvas.height);
+			//mcontext.putImageData(imageData, 0, 0);
+			//mcontext.drawImage(tcanvas.toDataURL('image/jpeg'), 0, 0, mcanvas.width, mcanvas.height, 0, 0, mcanvas.width, mcanvas.height);
+			
 			var tourl = mcanvas.toDataURL('image/jpeg');
 			var result = window.cep.fs.writeFile(getReslutFolderPath() + id + '.jpg', tourl.substr(23), window.cep.encoding.Base64);
 			if (result.err != 0) {
@@ -344,34 +381,22 @@
 			var deltay =(yssum - ysum * ysum / 256);
 			var denominator = Math.sqrt( deltax * deltay );
 			return member / denominator;
-		}	
+		}							
 		
-		/*function getCorrelation(x, y) {
-			var xsum = 0;
-			var ysum = 0;
-			var sum = 0;
-			var deltax = 0;	
-			var deltay = 0;	
-			for (var i = 0; i < 256; ++i) {
-				xsum += parseFloat(x[i]);	
-				ysum += parseFloat(y[i]);
+		function getImageRandom() {
+			var imageIndex = parseInt(Math.random() * assetsList.length);
+			return assetsList[imageIndex].assetID;
+		}
+		
+		function setAlpha(context, width, height) {
+			var imageData = context.getImageData(0, 0, width, height);
+			var index = imageData.data.length;
+			
+			for (var i = 0; i < index; i += 4) {
+				imageData.data[i + 3] = 180;
 			}
-			
-			/*for (var i = 0; i < 256; ++i) {
-				x[i] = parseFloat(x[i]) / Math.sqrt(xsum);
-				y[i] = parseFloat(y[i]) / Math.sqrt(ysum);
-			}*/	
-			
-			/*var xbar = xsum / 256;	
-			var ybar = ysum / 256;	
-			for (var i = 0; i < 256; ++i) {
-				sum += (parseFloat(x[i]) - xbar) * (parseFloat(y[i]) - ybar);
-				deltax += (parseFloat(x[i]) - xbar) * (parseFloat(x[i]) - xbar);
-				deltay += (parseFloat(y[i]) - ybar) * (parseFloat(y[i]) - ybar);
-			}
-			
-			return sum / (Math.sqrt(deltax) * Math.sqrt(deltay));
-		}	*/							
+			context.putImageData(imageData, 0, 0);
+		}
 		
 		function getSimilarImage(rVector, gVector, bVector) {
 			var minv = -3;
@@ -429,6 +454,7 @@
   	<div id="detail">
       <div class="image">
         <!--<img id="targetImage" class="targetImage" src="#" width="630" />-->
+        <canvas id="mosaicImages" class="mosaicImages" width="630"></canvas>
         <canvas id="targetImage" class="targetImage" width="630"></canvas>
       </div>
       <div class="control">
