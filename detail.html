@@ -80,6 +80,7 @@
 				scale = 630 / mimage.width;
 				mcanvas.width = 630;
 				mcanvas.height = mimage.height * scale;
+				mcontext.globalAlpha = 0.5;
 				mcontext.drawImage(mimage, 0, 0, mimage.width, mimage.height, 0, 0, mcanvas.width, mcanvas.height);
 			};
 			mimage.src = getTmpFolderPath() + assetID + '.jpg';
@@ -88,10 +89,9 @@
 				scale = 630 / timage.width;
 				tcanvas.width = 630;
 				tcanvas.height = timage.height * scale;
-				tcontext.globalAlpha = 0.6;
+				//tcontext.globalAlpha = 0.4;
 				tcontext.drawImage(timage, 0, 0, timage.width, timage.height, 0, 0, tcanvas.width, tcanvas.height);
 				//setAlpha(tcontext, tcanvas.width, tcanvas.height);
-				tcontext.globalAlpha = 0.7;
 			}
 			timage.src = getTmpFolderPath() + assetID + '.jpg';
 		}
@@ -110,7 +110,9 @@
 		}
 		
 		function generateMosaic() {
-			// Block UI
+			// Hidden over layer
+			$('#targetImage').css('visibility', 'hidden');
+			
 			var docWidth = mcanvas.width;
 			var docHeight = mcanvas.height;
 			var gutter = 0;					
@@ -143,10 +145,12 @@
 							var tmpID = getSimilarImage(srgbVector[0], srgbVector[1], srgbVector[2]);
 							var tmpImage = new Image();
 							tmpImage.onload = function() {
+								mcontext.globalCompositeOperation = "destination-over";
+								mcontext.globalAlpha = 1;
 								mcontext.drawImage(tmpImage, 0, 0, tmpImage.width, tmpImage.height, tx - slotWidth, ty - slotHeight, slotWidth, slotHeight);
 								setTimeout(function() {
 									lprocess.setProgress( n / (blockNum * blockNum));
-								}, n * 5);
+								}, n * 9);
 							};
 							if (tmpID.substr(0, 5) != 'asset' ) {
 								tmpID = 'asset-' + tmpID;
